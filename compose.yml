@@ -1,0 +1,38 @@
+services:
+  skport-checkin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: skport-checkin
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PUPPETEER_HEADLESS: "true"
+      PUPPETEER_DISABLE_SANDBOX: "true"
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+      PUPPETEER_USER_DATA_DIR: /app/.cache/puppeteer-profile
+      TOKEN_RESPONSE_TIMEOUT_MS: "15000"
+      ATTENDANCE_RESPONSE_TIMEOUT_MS: "15000"
+    volumes:
+      - skport_cache:/app/.cache
+    command:
+      - /bin/sh
+      - -c
+      - |
+        case "${REGION}" in
+          ASIA)
+            export TZ="Asia/Singapore"
+            ;;
+          AMERICAS|EUROPE)
+            export TZ="America/New_York"
+            ;;
+          *)
+            echo "Invalid REGION: ${REGION}. Expected ASIA, AMERICAS, or EUROPE."
+            exit 1
+            ;;
+        esac
+        exec node index.js
+
+volumes:
+  skport_cache:
