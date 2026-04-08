@@ -294,39 +294,14 @@ function getRoleIdByRegion(data, region) {
     })?.roleId ?? null;
 }
 
-async function getSessionTokenForBindingApi(page) {
-    const token = await page.evaluate(() => {
-        const values = [];
-        for (let i = 0; i < sessionStorage.length; i += 1) {
-            const key = sessionStorage.key(i);
-            if (!key) {
-                continue;
-            }
-
-            const value = sessionStorage.getItem(key);
-            if (typeof value === 'string' && value.trim()) {
-                values.push(value.trim());
-            }
-        }
-
-        const candidate = values
-            .map(value => value.split(':')[0].trim())
-            .find(Boolean);
-
-        return candidate ?? '';
-    });
-
-    if (!token) {
-        throw new Error('Token binding tidak ditemukan di sessionStorage setelah login.');
-    }
-
-    return token;
-}
-
 async function getRoleIdFromBindingApi(page, region) {
-    const token = await getSessionTokenForBindingApi(page);
-    const url = `${BINDING_LIST_API_URL}?token=${encodeURIComponent(token)}&appCode=endfield`;
-    const response = await fetch(url, { method: 'GET' });
+    await page.waitForFunction(() => {
+        return document.body.innerText.includes('Asia') || document.body.innerText.includes('Americas / Europe');
+    }, { timeout: 0 });
+    const targetSelector = '::-p-xpath(//div[text()="Asia" or text()="Americas" or text()="Europe" or text()="Americas / Europe"]/preceding-sibling::div[1])';
+    await page.waitForSelector(targetSelector);
+    await page.click(targetSelector);
+    const response = await page.waitForResponse(res => res.url().includes(BINDING_LIST_API_URL) && res.request().method() === 'GET', { timeout: TIMEOUT_MS });
 
     if (!response.ok) {
         throw new Error(`Gagal mengambil binding_list (HTTP ${response.status}).`);
@@ -334,6 +309,8 @@ async function getRoleIdFromBindingApi(page, region) {
 
     const responseJson = await response.json();
     const roleId = getRoleIdByRegion(responseJson, region);
+
+    console.log('Role ID:', roleId);
 
     if (!roleId) {
         throw new Error(`Role ID untuk region ${region} tidak ditemukan pada data binding account.`);
